@@ -1,16 +1,20 @@
 <html>
 <head>
-<title>Visual Subnet Calculator</title>
+<title>Visual Fn.Cidr Tool</title>
 <meta charset="utf-8">
 <script language="javascript" type="text/javascript">
 
 var curNetwork = 0;
 var curMask = 0;
+var curCount = 1;
+var curCidrBits = 0;
 
 function updateNetwork()
 {
   var newNetworkStr = document.forms['calc'].elements['network'].value;
   var newMask = parseInt(document.forms['calc'].elements['netbits'].value);
+  var newCount = parseInt(document.forms['calc'].elements['count'].value);
+  var newCidrBits = parseInt(document.forms['calc'].elements['cidrbits'].value);
 
   var newNetwork = inet_aton(newNetworkStr);
 
@@ -18,6 +22,28 @@ function updateNetwork()
     alert('Invalid network address entered');
     return;
   }
+
+  if ((!isNaN(newCount) && isNaN(newCidrBits)) || (isNaN(newCount) && !isNaN(newCidrBits))) {
+    alert('Both Count and Cidr Bits need to be provided.');
+    return;
+  }
+
+  if (newCount > 256 || newCount < 1) {
+    alert('Count is the number of CIDRs to generate. Valid range is between 1 and 256.');
+    return;
+  }
+  if (isNaN(newCount) || newCount <= 0) {
+    newCount = 1
+  }
+
+  if (newCidrBits > 16 || newCidrBits < 0) {
+    alert('Cidr Bits is the number of subnet bits for the CIDR. Valid range is between 0 and 16.');
+    return;
+  }
+  if (isNaN(newCidrBits) || newCidrBits < 0) {
+    newCidrBits = 0
+  }
+
 
   var tmpNetwork = network_address(newNetwork, newMask);
   if (newNetwork != tmpNetwork) {
@@ -31,20 +57,39 @@ function updateNetwork()
     return;
   }
 
-  if (curMask == 0) {
-    curMask = newMask;
-    curNetwork = newNetwork;
-    startOver();
+  if (newCount > 1 && newCidrBits > 0) {
+    var addressFirst = newNetwork;
+    var addressLast = subnet_last_address(newNetwork, newMask);
+    var numHosts = (1 + addressLast - addressFirst);
+
+    var mask2 = 32 - newCidrBits
+    var addressLast2 = subnet_last_address(newNetwork, mask2);
+    var numHosts2 = (1 + addressLast2 - addressFirst);
+    var sumHosts = numHosts2 * newCount
+
+    if (sumHosts > numHosts) {
+      alert('/' + newMask+' ('+numHosts+' IPs) cannot be split into '+newCount+' /'+mask2+' ('+sumHosts+' IPs).');
+      return;
+    }
   }
-  else if (curMask != newMask && confirm('You are changing the base network from /'+curMask+' to /'+newMask+'. This will reset any changes you have made. Proceed?')) {
+
+  if (curMask == 0) {
+    console.log("CheckPt: updateNetwork A")
+
     curMask = newMask;
     curNetwork = newNetwork;
+    curCount = newCount;
+    curCidrBits = newCidrBits;
 
     startOver();
   }
   else {
-    document.forms['calc'].elements['netbits'].value = curMask;
+    console.log("CheckPt: updateNetwork else")
+
+    curMask = newMask;
     curNetwork = newNetwork;
+    curCount = newCount;
+    curCidrBits = newCidrBits;
 
     recreateTables();
   }
@@ -69,18 +114,23 @@ function recreateTables()
     calcbody.removeChild(calcbody.firstChild);
   }
 
-  updateNumChildren(rootSubnet);
-  updateDepthChildren(rootSubnet);
+  mask = curMask
+  if (curCidrBits != 0) {
+    mask = 32 - curCidrBits
+  }
 
-  createRow(calcbody, rootSubnet, curNetwork, curMask, [curMask, rootSubnet[1], rootSubnet], rootSubnet[0]);
+  address = curNetwork
 
-  document.getElementById('joinHeader').colSpan = (rootSubnet[0] > 0 ? rootSubnet[0] : 1);
-  document.getElementById('col_join').span = (rootSubnet[0] > 0 ? rootSubnet[0] : 1);
+  for (var i=0; i<curCount; i++) {
+
+    createRow(calcbody, rootSubnet, address, mask, [mask, rootSubnet[1], rootSubnet], rootSubnet[0]);
+    address = address+subnet_addresses(mask)
+  }
 
   /* Create the bookmark hyperlink */
   var link = document.getElementById('saveLink');
   if (link) {
-    link.href = 'subnets.html?network='+inet_ntoa(curNetwork)+'&mask='+curMask+'&division='+binToAscii(nodeToString(rootSubnet));
+    link.href = 'fncidr.html?network='+inet_ntoa(curNetwork)+'&mask='+curMask+'&count='+curCount+'&cidrbits='+curCidrBits;
   }
 }
 
@@ -200,99 +250,6 @@ function createRow(calcbody, node, address, mask, labels, depth)
     var newCell = document.createElement('TD');
     newCell.appendChild(document.createTextNode(numHosts));
     newRow.appendChild(newCell);
-
-    /* actions */
-
-    var newCell = document.createElement('TD');
-    newRow.appendChild(newCell);
-
-    if (mask == 32) {
-      var newLink = document.createElement('SPAN');
-      newLink.className = 'disabledAction';
-      newLink.appendChild(document.createTextNode('Divide'));
-      newCell.appendChild(newLink);
-    }
-    else {
-      var newLink = document.createElement('A');
-      newLink.href = '#';
-      newLink.onclick = function () { divide(node); return false; }
-      newLink.appendChild(document.createTextNode('Divide'));
-      newCell.appendChild(newLink);
-    }
-
-    var colspan = depth - node[0];
-
-    for (var i=(labels.length/3)-1; i>=0; i--) {
-      var mask = labels[i*3];
-      var rowspan = labels[(i*3)+1];
-      var joinnode = labels[(i*3)+2];
-
-      var newCell = document.createElement('TD');
-      newCell.rowSpan = (rowspan > 1 ? rowspan : 1);
-      newCell.colSpan = (colspan > 1 ? colspan : 1);
-
-      if (i == (labels.length/3)-1) {
-        newCell.className = 'maskSpan';
-      }
-      else {
-        newCell.className = 'maskSpanJoinable';
-        newCell.onclick = newJoin(joinnode);
-        // newCell.onmouseover = function() { window.status = joinnode[0]+'---'+joinnode[1]+'---'+joinnode[2]+'>>>>>'+node[2];}
-      }
-
-      var newImg = document.createElement('IMG');
-      newImg.src = 'img/'+mask+'.gif';
-      newCell.appendChild(newImg);
-      newRow.appendChild(newCell);
-
-      colspan = 1; // reset for subsequent cells
-    }
-  }
-
-}
-
-/* This is necessary because 'joinnode' changes during the scope of the caller */
-function newJoin(joinnode)
-{
-  return function() { join(joinnode) };
-}
-
-function divide(node)
-{
-  node[2] = new Array();
-  node[2][0] = [0, 0, null];
-  node[2][1] = [0, 0, null];
-  recreateTables();
-}
-
-function join(node)
-{
-  /* easy as pie */
-  node[2] = null;
-  recreateTables();
-}
-
-function updateNumChildren(node)
-{
-  if (node[2] == null) {
-    node[1] = 0;
-    return 1;
-  }
-  else {
-    node[1] = updateNumChildren(node[2][0]) + updateNumChildren(node[2][1]);
-    return node[1];
-  }
-}
-
-function updateDepthChildren(node)
-{
-  if (node[2] == null) {
-    node[0] = 0;
-    return 1;
-  }
-  else {
-    node[0] = updateDepthChildren(node[2][0]) + updateDepthChildren(node[2][1]);
-    return node[1];
   }
 }
 
@@ -372,17 +329,13 @@ function preloadSubnetImages()
 
 function calcOnLoad()
 {
-  preloadSubnetImages();
   args = parseQueryString();
-  if (args['network'] && args['mask'] && args['division']) {
+  if (args['network'] && args['mask'] && args['count'] && args['cidrbits']) {
     document.forms['calc'].elements['network'].value = args['network'];
     document.forms['calc'].elements['netbits'].value = args['mask'];
+    document.forms['calc'].elements['count'].value = args['count'];
+    document.forms['calc'].elements['cidrbits'].value = args['cidrbits'];
     updateNetwork();
-    var division = asciiToBin(args['division']);
-    rootSubnet = [0, 0, null];
-    if (division != '0') {
-      loadNode(rootSubnet, division);
-    }
     recreateTables();
   }
   else {
@@ -504,7 +457,7 @@ P		{
 <tr valign=top>
 <td>
 
-<h1>Visual Subnet Calculator</h1>
+<h1>Visual Fn.Cidr Tool</h1>
 
 <p>Enter the network you wish to subnet:</p>
 
@@ -514,10 +467,14 @@ P		{
 <tr>
 <td class="label">Network Address</td>
 <td class="label">Mask bits</td>
+<td class="label">Count</td>
+<td class="label">Cidr Bits</td>
 </tr>
 <tr>
-<td><input type="text" name="network" size="15" maxlength="15" value="192.168.0.0"></td>
+<td><input type="text" name="network" size="15" maxlength="15" value="10.0.0.0"></td>
 <td>/<input type="text" name="netbits" size="2" maxlength="2" value="16"></td>
+<td><input type="text" name="count" size="15" maxlength="3" value=""></td>
+<td><input type="text" name="cidrbits" size="15" maxlength="2" value=""></td>
 <td><input type="submit" value="Update">
 <input type="button" value="Reset" onclick="if (confirm('This will reset all subnet divisions you have made. Proceed?')) startOver();">
 </td>
@@ -530,13 +487,11 @@ P		{
 <input type="checkbox" id="cb_range" checked onclick="toggleColumn(this)"><label for="cb_range">Range of addresses</label>
 <input type="checkbox" id="cb_useable" checked onclick="toggleColumn(this)"><label for="cb_useable">Useable IPs</label>
 <input type="checkbox" id="cb_hosts" checked onclick="toggleColumn(this)"><label for="cb_hosts">Hosts</label>
-<input type="checkbox" id="cb_divide" checked onclick="toggleColumn(this)"><label for="cb_divide">Divide</label>
-<input type="checkbox" id="cb_join" checked onclick="toggleColumn(this)"><label for="cb_join">Join</label>
 </p>
 </form>
 
 <p>Click below to split and join subnets.<br>
-If you wish to save this subnetting for later, bookmark <a href="subnets.html" id="saveLink">this hyperlink</a>.</p>
+If you wish to save this subnetting for later, bookmark <a href="fncidr.html" id="saveLink">this hyperlink</a>.</p>
 
 </td>
 <td align="right">
@@ -556,8 +511,6 @@ If you wish to save this subnetting for later, bookmark <a href="subnets.html" i
 <col id="col_range">
 <col id="col_useable">
 <col id="col_hosts">
-<col id="col_divide">
-<col id="col_join">
 </colgroup>
 <thead>
 <tr>
@@ -566,8 +519,6 @@ If you wish to save this subnetting for later, bookmark <a href="subnets.html" i
 <td>Range of addresses</td>
 <td>Useable IPs</td>
 <td>Hosts</td>
-<td>Divide</td>
-<td id="joinHeader">Join</td>
 </tr>
 </thead>
 <tbody id="calcbody">
