@@ -122,8 +122,7 @@ function recreateTables()
   address = curNetwork
 
   for (var i=0; i<curCount; i++) {
-
-    createRow(calcbody, rootSubnet, address, mask, [mask, rootSubnet[1], rootSubnet], rootSubnet[0]);
+    createRow(calcbody, rootSubnet, address, mask, [mask, rootSubnet[1], rootSubnet], rootSubnet[0], i);
     address = address+subnet_addresses(mask)
   }
 
@@ -182,7 +181,7 @@ function asciiToBin(str)
   return out;
 }
 
-function createRow(calcbody, node, address, mask, labels, depth)
+function createRow(calcbody, node, address, mask, labels, depth, index)
 {
   if (node[2]) {
     var newlabels = labels;
@@ -200,6 +199,11 @@ function createRow(calcbody, node, address, mask, labels, depth)
   else {
     var newRow = document.createElement('TR');
     calcbody.appendChild(newRow);
+
+    /* Row index */
+    var newCell = document.createElement('TD');
+    newCell.appendChild(document.createTextNode(index));
+    newRow.appendChild(newCell);
 
     /* subnet address */
     var newCell = document.createElement('TD');
@@ -481,13 +485,6 @@ P		{
 </tr>
 </table>
 
-<p>Show columns:
-<input type="checkbox" id="cb_subnet" checked onclick="toggleColumn(this)"><label for="cb_subnet">Subnet address</label>
-<input type="checkbox" id="cb_netmask" onclick="toggleColumn(this)"><label for="cb_netmask">Netmask</label>
-<input type="checkbox" id="cb_range" checked onclick="toggleColumn(this)"><label for="cb_range">Range of addresses</label>
-<input type="checkbox" id="cb_useable" checked onclick="toggleColumn(this)"><label for="cb_useable">Useable IPs</label>
-<input type="checkbox" id="cb_hosts" checked onclick="toggleColumn(this)"><label for="cb_hosts">Hosts</label>
-</p>
 </form>
 
 <p>Click below to split and join subnets.<br>
@@ -506,6 +503,7 @@ If you wish to save this subnetting for later, bookmark <a href="fncidr.html" id
 
 <table class="calc" cellspacing="0" cellpadding="2">
 <colgroup>
+<col id="col_index">
 <col id="col_subnet">
 <col id="col_netmask" style="display: none">
 <col id="col_range">
@@ -514,6 +512,7 @@ If you wish to save this subnetting for later, bookmark <a href="fncidr.html" id
 </colgroup>
 <thead>
 <tr>
+<td>Row index</td>
 <td>Subnet address</td>
 <td>Netmask</td>
 <td>Range of addresses</td>
