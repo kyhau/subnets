@@ -1,20 +1,25 @@
 # Visual Subnet Tools
 
-This repo is forked from https://github.com/davidc/subnets.
+This repository is originally forked from https://github.com/davidc/subnets.
 
-## Addition / Modification
+Additions and changes are detailed below.
 
-- Visual Fn.Cidr tool (NEW): [https://kyhau.github.io/visual-subnet-tools/fncidr.html](https://kyhau.github.io/visual-subnet-tools/fncidr.html)
+---
+## 🆕 Visual Fn::Cidr tool (NEW)
 
-- Visual subnet calculator (modified): [https://kyhau.github.io/visual-subnet-tools/subnets.html](https://kyhau.github.io/visual-subnet-tools/subnets.html)
+[https://kyhau.github.io/visual-subnet-tools/fncidr.html](https://kyhau.github.io/visual-subnet-tools/fncidr.html)
 
+This tool calculates and shows the potential outputs of the AWS CloudFormation's intrinsic function [`Fn::Cidr`](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/intrinsic-function-reference-cidr.html) (or `!Cidr`), which returns an array of CIDR address blocks.
 
-### See also
+This tool takes the same input as `!Cidr [ ipBlock, count, cidrBits ]`.
 
-- https://blog.james.rcpt.to/2018/03/16/aws-vpcs-calculating-subnets-in-cloudformation/
+See also this blog post https://blog.james.rcpt.to/2018/03/16/aws-vpcs-calculating-subnets-in-cloudformation/.
 
+---
+## 🚀 Visual subnet calculator (modified version of davidc/subnets)
+[https://kyhau.github.io/visual-subnet-tools/subnets.html](https://kyhau.github.io/visual-subnet-tools/subnets.html)
 
-# Run with docker
+### Run with docker
 
 ```
 cd <project folder>
